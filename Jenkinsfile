@@ -1,81 +1,22 @@
 pipeline {
-    agent {
-        dockerfile {
-            filename 'Dockerfile'
-            dir '.'
-            // Use the SDK build stage so dotnet CLI is available
-            additionalBuildArgs '--target build'
-        }
-    }
-
-    environment {
-        DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-        DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
-        BUILD_CONFIGURATION = 'Release'
-    }
-
-    options {
-        timestamps()
-    }
-
+    agent any 
     stages {
-        stage('Checkout') {
+        stage('Build') { 
             steps {
-                checkout scm
+                sh 'dotnet restore' 
+                sh 'dotnet build --no-restore' 
             }
         }
-
-        stage('Restore') {
+        
+        stage('Deliver') { 
             steps {
-                sh 'dotnet restore HelloWorld.csproj'
+                sh 'dotnet publish HelloWorld --no-restore -o published' 
             }
-        }
-
-        stage('Build') {
-            steps {
-                sh 'dotnet build HelloWorld.csproj -c ${BUILD_CONFIGURATION} --no-restore'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                script {
-                    def hasTests = sh(
-                        returnStatus: true,
-                        script: 'ls *Tests.csproj >/dev/null 2>&1'
-                    ) == 0
-
-                    if (hasTests) {
-                        sh '''
-                            set -e
-                            for proj in *Tests.csproj; do
-                                dotnet test "$proj" -c ${BUILD_CONFIGURATION} --no-build
-                            done
-                        '''
-                    } else {
-                        echo 'No *Tests.csproj projects detected. Skipping tests.'
-                    }
+            post {
+                success {
+                    archiveArtifacts 'published/*.*'
                 }
             }
         }
-
-        stage('Publish') {
-            steps {
-                sh 'dotnet publish HelloWorld.csproj -c ${BUILD_CONFIGURATION} -o build/publish --no-build'
-            }
-        }
-    }
-
-    post {
-        success {
-            archiveArtifacts artifacts: 'build/publish/**', fingerprint: true, allowEmptyArchive: true
-        }
-        failure {
-            echo 'Pipeline failed. Check logs above.'
-        }
-        always {
-            cleanWs()
-        }
     }
 }
-
