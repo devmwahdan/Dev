@@ -1,5 +1,12 @@
 pipeline {
-    agent any
+    agent {
+        dockerfile {
+            filename 'Dockerfile'
+            dir '.'
+            // Use the SDK build stage so dotnet CLI is available
+            additionalBuildArgs '--target build'
+        }
+    }
 
     environment {
         DOTNET_CLI_TELEMETRY_OPTOUT = '1'
